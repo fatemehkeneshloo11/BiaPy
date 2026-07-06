@@ -6,3 +6,9 @@ biapy.egg-info/
 biapy_checks/
 dist/
 *.DS_Store
+*.bak
+*.bak*
+biapy/data/pre_processing_original.py
+fibsem_epfl.zip
+results_summary.csv
+
