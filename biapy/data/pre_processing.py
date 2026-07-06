@@ -29,7 +29,7 @@ from skimage.transform import resize
 from skimage.feature import canny
 from skimage.exposure import equalize_adapthist
 from skimage.color import rgb2gray
-from skimage.filters import gaussian, median
+from skimage.filters import gaussian, median, threshold_otsu
 from yacs.config import CfgNode as CN
 from numpy.typing import NDArray
 from typing import List, Optional, Dict, Tuple, Sequence, Union
@@ -2902,18 +2902,52 @@ def create_ssl_source_data_masks(cfg: CN, data_type: str = "train"):
     print("Creating {} SSL source. . .".format(data_type))
     for i in range(len(ids)):
         if not os.path.exists(os.path.join(out_dir, ids[i])):
-            print("Crappifying file {} to create SSL source".format(os.path.join(img_dir, ids[i])))
-            img = read_img_as_ndarray(os.path.join(img_dir, ids[i]), is_3d=not cfg.PROBLEM.NDIM == "2D")
-            img = crappify(
-                img,
-                resizing_factor=cfg.PROBLEM.SELF_SUPERVISED.RESIZING_FACTOR,
-                add_noise=add_noise,
-                noise_level=cfg.PROBLEM.SELF_SUPERVISED.NOISE,
+            print(
+            "Creating {} SSL source: {}".format(
+                cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK,
+                os.path.join(img_dir, ids[i]),
             )
+        )
+            img = read_img_as_ndarray(os.path.join(img_dir, ids[i]), is_3d=not cfg.PROBLEM.NDIM == "2D")
+            if cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "crappify":
+
+                img = crappify(
+                    img,
+                    resizing_factor=cfg.PROBLEM.SELF_SUPERVISED.RESIZING_FACTOR,
+                    add_noise=add_noise,
+                    noise_level=cfg.PROBLEM.SELF_SUPERVISED.NOISE,
+                )
+
+            elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsu":
+
+                img = create_otsu_target(img)
 
             save_tif(np.expand_dims(img, 0), out_dir, [ids[i]])
         else:
             print("Source file {} found".format(os.path.join(img_dir, ids[i])))
+
+
+def create_otsu_target(input_img):
+    """Create an Otsu binary target image."""
+
+    if input_img.ndim == 2:
+        gray = input_img
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 1:
+        gray = input_img[..., 0]
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 3:
+        gray = rgb2gray(input_img)
+
+    else:
+        raise ValueError(f"Unsupported image shape: {input_img.shape}")
+
+    thr = threshold_otsu(gray)
+
+    mask = (gray > thr).astype(np.float32)
+
+    return mask[..., None]
+
 
 
 def crappify(
@@ -2967,32 +3001,131 @@ def crappify(
         targ_sz = (new_d, new_w, new_h)
 
     img = input_img.copy()
-    if add_noise:
-        assert noise_level
-        img = add_gaussian_noise(img, noise_level)
 
-    img = resize(
+    img = apply_mixed_degradation(
+        img,
+        resizing_factor,
+    )
+
+    return img.astype(input_img.dtype)
+
+
+
+# ==========================================================
+# FIBSEM Stochastic Mixed Degradation
+# ==========================================================
+
+def apply_noise(img):
+
+    sigma=np.random.uniform(0.02,0.08)
+
+    return add_gaussian_noise(img,sigma)
+
+
+def apply_blur(img):
+
+    sigma=np.random.uniform(0.5,1.5)
+
+    return gaussian(
+        img,
+        sigma=sigma,
+        preserve_range=True,
+        channel_axis=-1,
+    )
+
+
+def apply_downup(img,resizing_factor):
+
+    if img.ndim==3:
+
+        w,h,c=img.shape
+
+        org_sz=(w,h)
+
+        factor=np.random.uniform(
+            resizing_factor*0.8,
+            resizing_factor*1.2
+        )
+
+        new_w=int(w/np.sqrt(factor))
+        new_h=int(h/np.sqrt(factor))
+
+        targ_sz=(new_w,new_h)
+
+    else:
+
+        d,w,h,c=img.shape
+
+        org_sz=(d,w,h)
+
+        factor=np.random.uniform(
+            resizing_factor*0.8,
+            resizing_factor*1.2
+        )
+
+        new_d=int(d/np.sqrt(factor))
+        new_w=int(w/np.sqrt(factor))
+        new_h=int(h/np.sqrt(factor))
+
+        targ_sz=(new_d,new_w,new_h)
+
+    img=resize(
         img,
         targ_sz,
         order=1,
         mode="reflect",
         clip=True,
         preserve_range=True,
-        anti_aliasing=False,
+        anti_aliasing=True,
     )
 
-    if Down_up:
-        img = resize(
-            img,
-            org_sz,
-            order=1,
-            mode="reflect",
-            clip=True,
-            preserve_range=True,
-            anti_aliasing=False,
-        )
+    img=resize(
+        img,
+        org_sz,
+        order=1,
+        mode="reflect",
+        clip=True,
+        preserve_range=True,
+        anti_aliasing=True,
+    )
 
-    return img.astype(input_img.dtype)
+    return img
+
+
+def apply_mixed_degradation(img, resizing_factor):
+
+    r = np.random.rand()
+
+    # 15% Noise
+    if r < 0.15:
+        img = apply_noise(img)
+
+    # 15% Blur
+    elif r < 0.30:
+        img = apply_blur(img)
+
+    # 15% Down-Up
+    elif r < 0.45:
+        img = apply_downup(img, resizing_factor)
+
+    # 20% Noise + Blur
+    elif r < 0.65:
+        img = apply_noise(img)
+        img = apply_blur(img)
+
+    # 20% Blur + Down-Up
+    elif r < 0.85:
+        img = apply_blur(img)
+        img = apply_downup(img, resizing_factor)
+
+    # 15% Noise + Blur + Down-Up
+    else:
+        img = apply_noise(img)
+        img = apply_blur(img)
+        img = apply_downup(img, resizing_factor)
+
+    return img
+
 
 
 def add_gaussian_noise(image: NDArray, percentage_of_noise: float) -> NDArray:

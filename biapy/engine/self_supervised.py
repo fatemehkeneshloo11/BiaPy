@@ -816,6 +816,8 @@ class Self_supervised_Workflow(Base_Workflow):
             dist.barrier()
 
         opts = []
+        use_otsu = self.cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsu"
+
         if self.cfg.TRAIN.ENABLE or self.cfg.DATA.TEST.USE_VAL_AS_TEST:
             print(
                 "DATA.TRAIN.PATH changed from {} to {}".format(
@@ -825,14 +827,24 @@ class Self_supervised_Workflow(Base_Workflow):
             print(
                 "DATA.TRAIN.GT_PATH changed from {} to {}".format(self.cfg.DATA.TRAIN.GT_PATH, self.cfg.DATA.TRAIN.PATH)
             )
-            opts.extend(
-                [
-                    "DATA.TRAIN.PATH",
-                    self.cfg.DATA.TRAIN.SSL_SOURCE_DIR,
-                    "DATA.TRAIN.GT_PATH",
-                    self.cfg.DATA.TRAIN.PATH,
-                ]
-            )
+            if use_otsu:
+                opts.extend(
+                    [
+                        "DATA.TRAIN.PATH",
+                        self.cfg.DATA.TRAIN.PATH,
+                        "DATA.TRAIN.GT_PATH",
+                        self.cfg.DATA.TRAIN.SSL_SOURCE_DIR,
+                    ]
+                )
+            else:
+                opts.extend(
+                    [
+                        "DATA.TRAIN.PATH",
+                        self.cfg.DATA.TRAIN.SSL_SOURCE_DIR,
+                        "DATA.TRAIN.GT_PATH",
+                        self.cfg.DATA.TRAIN.PATH,
+                    ]
+                )
             if not self.cfg.DATA.VAL.FROM_TRAIN:
                 print(
                     "DATA.VAL.PATH changed from {} to {}".format(
@@ -842,14 +854,24 @@ class Self_supervised_Workflow(Base_Workflow):
                 print(
                     "DATA.VAL.GT_PATH changed from {} to {}".format(self.cfg.DATA.VAL.GT_PATH, self.cfg.DATA.VAL.PATH)
                 )
-                opts.extend(
-                    [
-                        "DATA.VAL.PATH",
-                        self.cfg.DATA.VAL.SSL_SOURCE_DIR,
-                        "DATA.VAL.GT_PATH",
-                        self.cfg.DATA.VAL.PATH,
-                    ]
-                )
+                if use_otsu:
+                    opts.extend(
+                        [
+                            "DATA.VAL.PATH",
+                            self.cfg.DATA.VAL.PATH,
+                            "DATA.VAL.GT_PATH",
+                            self.cfg.DATA.VAL.SSL_SOURCE_DIR,
+                        ]
+                    )
+                else:
+                    opts.extend(
+                        [
+                            "DATA.VAL.PATH",
+                            self.cfg.DATA.VAL.SSL_SOURCE_DIR,
+                            "DATA.VAL.GT_PATH",
+                            self.cfg.DATA.VAL.PATH,
+                        ]
+                    )
         if self.cfg.TEST.ENABLE:
             print(
                 "DATA.TEST.PATH changed from {} to {}".format(
@@ -857,14 +879,24 @@ class Self_supervised_Workflow(Base_Workflow):
                 )
             )
             print("DATA.TEST.GT_PATH changed from {} to {}".format(self.cfg.DATA.TEST.GT_PATH, self.cfg.DATA.TEST.PATH))
-            opts.extend(
-                [
-                    "DATA.TEST.PATH",
-                    self.cfg.DATA.TEST.SSL_SOURCE_DIR,
-                    "DATA.TEST.GT_PATH",
-                    self.cfg.DATA.TEST.PATH,
-                ]
-            )
+            if use_otsu:
+                opts.extend(
+                    [
+                        "DATA.TEST.PATH",
+                        self.cfg.DATA.TEST.PATH,
+                        "DATA.TEST.GT_PATH",
+                        self.cfg.DATA.TEST.SSL_SOURCE_DIR,
+                    ]
+                )
+            else:
+                opts.extend(
+                    [
+                        "DATA.TEST.PATH",
+                        self.cfg.DATA.TEST.SSL_SOURCE_DIR,
+                        "DATA.TEST.GT_PATH",
+                        self.cfg.DATA.TEST.PATH,
+                    ]
+                )
         self.cfg.merge_from_list(opts)
 
     def after_all_chunk_prediction_workflow_process(self):

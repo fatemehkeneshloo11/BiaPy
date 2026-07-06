@@ -1891,9 +1891,12 @@ def check_configuration(cfg, jobname, check_data_paths=True):
             ], "'MODEL.MAE_MASK_TYPE' needs to be in ['random', 'grid']"
             if cfg.MODEL.MAE_MASK_TYPE == "random" and not check_value(cfg.MODEL.MAE_MASK_RATIO):
                 raise ValueError("'MODEL.MAE_MASK_RATIO' not in [0, 1] range")
+        elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsu":
+            pass
+
         else:
             raise ValueError(
-                "'PROBLEM.SELF_SUPERVISED.PRETEXT_TASK' needs to be among these options: ['crappify', 'masking']"
+                "'PROBLEM.SELF_SUPERVISED.PRETEXT_TASK' needs to be among these options: ['crappify', 'masking', 'otsu']"
             )
         if cfg.MODEL.SOURCE == "torchvision":
             raise ValueError("'MODEL.SOURCE' as 'torchvision' is not available in self-supervised workflow")
