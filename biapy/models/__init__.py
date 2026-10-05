@@ -391,6 +391,25 @@ def build_model(
             )
             model = MaskedAutoencoderViT(**args)  # type: ignore
             callable_model = MaskedAutoencoderViT  # type: ignore
+        elif modelname == "spark":
+            args = dict(
+                image_shape=cfg.DATA.PATCH_SIZE,
+                encoder=cfg.MODEL.SPARK.ENCODER,
+                feature_maps=cfg.MODEL.FEATURE_MAPS,
+                upsample_layer=cfg.MODEL.UPSAMPLE_LAYER,
+                z_down=cfg.MODEL.Z_DOWN,
+                cn_layers=cfg.MODEL.CONVNEXT_LAYERS,
+                layer_scale=cfg.MODEL.CONVNEXT_LAYER_SCALE,
+                stochastic_depth_prob=cfg.MODEL.CONVNEXT_SD_PROB,
+                isotropy=cfg.MODEL.ISOTROPY,
+                stem_k_size=cfg.MODEL.CONVNEXT_STEM_K_SIZE,
+                mask_ratio=cfg.MODEL.SPARK.MASK_RATIO,
+                decoder_width=cfg.MODEL.SPARK.DECODER_WIDTH,
+                densify_norm=cfg.MODEL.SPARK.DENSIFY_NORM,
+                norm_pix_loss=cfg.MODEL.SPARK.NORM_PIX_LOSS,
+            )
+            model = SparK(**args)  # type: ignore
+            callable_model = SparK  # type: ignore
         elif modelname == "nafnet":
             args = dict(
                 img_channel=cfg.DATA.PATCH_SIZE[-1],

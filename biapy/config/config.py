@@ -1357,6 +1357,22 @@ class Config:
         # Percentage of the input image to mask (applied only when MODEL.MAE_MASK_TYPE == "random"). Value between 0 and 1.
         _C.MODEL.MAE_MASK_RATIO = 0.5
 
+        # SparK masked image modeling for convnets (used when MODEL.ARCHITECTURE == 'spark' and
+        # PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == 'masking'). The encoder is built with the same keys as
+        # 'unext_v1' (MODEL.FEATURE_MAPS, MODEL.CONVNEXT_*, MODEL.ISOTROPY, ...) so its weights can be
+        # loaded into 'unext_v1' for fine-tuning.
+        _C.MODEL.SPARK = CN()
+        # Encoder architecture. Options: ['unext_v1']
+        _C.MODEL.SPARK.ENCODER = "unext_v1"
+        # Fraction of masked patches. Patch size = total downsampling of the encoder (32 for UNeXt-V1 with 5 levels)
+        _C.MODEL.SPARK.MASK_RATIO = 0.6
+        # Channels of the SparK light decoder at its deepest scale (halved at every upsampling)
+        _C.MODEL.SPARK.DECODER_WIDTH = 256
+        # Normalization of the sparse features before densifying. Options: ['ln', 'bn', 'none']
+        _C.MODEL.SPARK.DENSIFY_NORM = "ln"
+        # Normalize each target patch by its own mean and std before the L2 loss (as in SparK and MAE)
+        _C.MODEL.SPARK.NORM_PIX_LOSS = True
+
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # 5.1.3 RCAN architecture options
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

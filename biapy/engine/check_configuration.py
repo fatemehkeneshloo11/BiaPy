@@ -1881,9 +1881,9 @@ def check_configuration(cfg, jobname, check_data_paths=True):
                     "'MODEL.ARCHITECTURE' can not be 'mae' when 'PROBLEM.SELF_SUPERVISED.PRETEXT_TASK' is 'crappify'"
                 )
         elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "masking":
-            if not model_will_be_read and model_arch != "mae":
+            if not model_will_be_read and model_arch not in ["mae", "spark"]:
                 raise ValueError(
-                    "'MODEL.ARCHITECTURE' needs to be 'mae' when 'PROBLEM.SELF_SUPERVISED.PRETEXT_TASK' is 'masking'"
+                    "'MODEL.ARCHITECTURE' needs to be 'mae' or 'spark' when 'PROBLEM.SELF_SUPERVISED.PRETEXT_TASK' is 'masking'"
                 )
             assert cfg.MODEL.MAE_MASK_TYPE in [
                 "random",
@@ -2466,6 +2466,7 @@ def check_configuration(cfg, jobname, check_data_paths=True):
             "wdsr",
             "vit",
             "mae",
+            "spark",
             "unext_v1",
             "unext_v2",
             "hrnet",
@@ -2485,6 +2486,7 @@ def check_configuration(cfg, jobname, check_data_paths=True):
                 "unetr",
                 "vit",
                 "mae",
+                "spark",
                 "unext_v1",
                 "unext_v2",
                 "dfcan",
@@ -2508,6 +2510,7 @@ def check_configuration(cfg, jobname, check_data_paths=True):
                         "unetr",
                         "vit",
                         "mae",
+                        "spark",
                         "unext_v1",
                         "unext_v2",
                         "dfcan",
@@ -2869,6 +2872,7 @@ def check_configuration(cfg, jobname, check_data_paths=True):
                 "wdsr",
                 "vit",
                 "mae",
+                "spark",
                 "hrnet",
                 "stunet",
             ]:

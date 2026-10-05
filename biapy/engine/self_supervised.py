@@ -232,7 +232,7 @@ class Self_supervised_Workflow(Base_Workflow):
                 )
                 self.test_metric_names.append("LPIPS")
 
-        if self.cfg.MODEL.ARCHITECTURE.lower() == "mae":
+        if self.cfg.MODEL.ARCHITECTURE.lower() in ["mae", "spark"]:
             print("Overriding 'LOSS.TYPE' to set it to MSE loss (masking patches)")
             self.loss = self.MaskedAutoencoderViT_loss_wrapper
         else:
