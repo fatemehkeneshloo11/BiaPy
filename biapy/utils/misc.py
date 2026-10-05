@@ -517,7 +517,7 @@ def load_model_checkpoint(cfg, jobname, model_without_ddp, device, optimizer=Non
             "model": load_file(resume, device="cpu")
         }
     else: # ends with .pth
-        checkpoint = torch.load(resume, map_location=device, weights_only=True)
+        checkpoint = torch.load(resume, map_location=device, weights_only=False)
 
     if just_extract_checkpoint_info:
         if "cfg" not in checkpoint and not resume.endswith(".safetensors"):
@@ -541,7 +541,19 @@ def load_model_checkpoint(cfg, jobname, model_without_ddp, device, optimizer=Non
         checkpoint_state_dict = checkpoint
 
     if not skip_unmatched_layers:
+        first = next(model_without_ddp.parameters())
+        print("=" * 60)
+        print("BEFORE LOAD")
+        print("Mean:", first.mean().item())
+        print("Std :", first.std().item())
+
         model_without_ddp.load_state_dict(checkpoint_state_dict, strict=True)
+
+        first = next(model_without_ddp.parameters())
+        print("=" * 60)
+        print("AFTER LOAD")
+        print("Mean:", first.mean().item())
+        print("Std :", first.std().item())
     else:
         # Filter out layers with mismatched shapes
         filtered_state_dict = {}
