@@ -1891,12 +1891,27 @@ def check_configuration(cfg, jobname, check_data_paths=True):
             ], "'MODEL.MAE_MASK_TYPE' needs to be in ['random', 'grid']"
             if cfg.MODEL.MAE_MASK_TYPE == "random" and not check_value(cfg.MODEL.MAE_MASK_RATIO):
                 raise ValueError("'MODEL.MAE_MASK_RATIO' not in [0, 1] range")
-        elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsu":
+        elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsuMitoem":
+            pass
+
+        elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsuMitoem2":
+            pass
+
+        elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsuMitoemAuto":
+            pass
+
+        elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "prebuilt_mitoem3":
+            pass
+
+        elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "nlm_v3":
+            pass
+
+        elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "nlm_v4":
             pass
 
         else:
             raise ValueError(
-                "'PROBLEM.SELF_SUPERVISED.PRETEXT_TASK' needs to be among these options: ['crappify', 'masking', 'otsu']"
+                "'PROBLEM.SELF_SUPERVISED.PRETEXT_TASK' needs to be among these options: ['crappify', 'masking', 'otsuMitoem', 'otsuMitoem2', 'otsuMitoemAuto', 'prebuilt_mitoem3', 'nlm_v3', 'nlm_v4']"
             )
         if cfg.MODEL.SOURCE == "torchvision":
             raise ValueError("'MODEL.SOURCE' as 'torchvision' is not available in self-supervised workflow")

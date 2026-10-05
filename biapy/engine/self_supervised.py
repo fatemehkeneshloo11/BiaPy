@@ -757,7 +757,7 @@ class Self_supervised_Workflow(Base_Workflow):
                         create_mask = True
                     else:
                         print("Train source data found in {}".format(self.cfg.DATA.TRAIN.SSL_SOURCE_DIR))
-                if create_mask:
+                if create_mask and self.cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK not in ["otsuMitoem2", "prebuilt_mitoem3"]:
                     create_ssl_source_data_masks(self.cfg, data_type="train")
 
             # Create selected channels for val data
@@ -783,7 +783,7 @@ class Self_supervised_Workflow(Base_Workflow):
                         create_mask = True
                     else:
                         print("Validation source data found in {}".format(self.cfg.DATA.VAL.SSL_SOURCE_DIR))
-                if create_mask:
+                if create_mask and self.cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK not in ["otsuMitoem2", "prebuilt_mitoem3"]:
                     create_ssl_source_data_masks(self.cfg, data_type="val")
 
             # Create selected channels for test data
@@ -816,7 +816,7 @@ class Self_supervised_Workflow(Base_Workflow):
             dist.barrier()
 
         opts = []
-        use_otsu = self.cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsu"
+        use_otsu = self.cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK in ["otsu", "otsuMitoem", "otsuMitoem2", "prebuilt_mitoem3", "otsuMitoemAuto"]
 
         if self.cfg.TRAIN.ENABLE or self.cfg.DATA.TEST.USE_VAL_AS_TEST:
             print(

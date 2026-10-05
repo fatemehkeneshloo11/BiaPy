@@ -23,7 +23,7 @@ from scipy.ndimage import (
     uniform_filter,
     binary_dilation as binary_dilation_scipy
 )
-from skimage.morphology import disk, binary_dilation, binary_erosion, skeletonize
+from skimage.morphology import disk, dilation, remove_small_objects, remove_small_holes, opening, closing, binary_opening, binary_closing, binary_dilation, binary_erosion, skeletonize
 from skimage.measure import label, regionprops_table
 from skimage.transform import resize
 from skimage.feature import canny
@@ -34,6 +34,7 @@ from yacs.config import CfgNode as CN
 from numpy.typing import NDArray
 from typing import List, Optional, Dict, Tuple, Sequence, Union
 from scipy.spatial import cKDTree
+import cv2
 
 from biapy.data.dataset import BiaPyDataset
 from biapy.utils.util import (
@@ -2920,12 +2921,128 @@ def create_ssl_source_data_masks(cfg: CN, data_type: str = "train"):
 
             elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsu":
 
-                img = create_otsu_target(img)
+                img = create_bilateral_adaptive_target(img)
+            elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsuMitoem2":
+
+                img = create_otsu_mitoem_target(img)
+
+            elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "otsuMitoemAuto":
+
+                img = create_otsu_mitoem_target(img)
+
+            elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "canny":
+
+                img = create_canny_target(img)
+
+            elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "edge_map":
+
+                img = create_edge_map_target(img)
+
+            elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "nlm":
+
+                img = create_nlm_target(img)
+
+            elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "nlm_v3":
+
+                img = create_nlm_v3_target(img)
+
+            elif cfg.PROBLEM.SELF_SUPERVISED.PRETEXT_TASK == "nlm_v4":
+
+                img = create_nlm_v4_target(img)
 
             save_tif(np.expand_dims(img, 0), out_dir, [ids[i]])
         else:
             print("Source file {} found".format(os.path.join(img_dir, ids[i])))
 
+
+
+
+def create_otsu_mitoem_target(input_img):
+    """
+    MitoEM-specific pseudo-label target.
+
+    Pipeline:
+        Gaussian -> Otsu -> Canny -> Dilation
+
+    Classes:
+        0 = Background
+        1 = Foreground
+        2 = Boundary
+
+    Pretraining values:
+        0   = Background
+        127 = Foreground
+        255 = Boundary
+    """
+
+    if input_img.ndim == 2:
+        gray = input_img
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 1:
+        gray = input_img[..., 0]
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 3:
+        gray = rgb2gray(input_img)
+
+    else:
+        raise ValueError(
+            f"Unsupported image shape: {input_img.shape}"
+        )
+
+    gray = gray.astype(np.float32)
+
+    if gray.max() > 1.0:
+        gray = gray / gray.max()
+
+    # Gaussian blur
+    blurred = gaussian(
+        gray,
+        sigma=2.0,
+        preserve_range=True
+    )
+
+    # Otsu threshold
+    threshold_value = threshold_otsu(blurred)
+
+    otsu_mask = (
+        blurred > threshold_value
+    ).astype(np.uint8)
+
+    # Canny edge detection
+    edges = canny(
+        otsu_mask.astype(float),
+        sigma=1.0
+    )
+
+    # Dilate boundaries
+    dilated_edges = dilation(
+        edges,
+        disk(2)
+    )
+
+    # 3-class pseudo-label
+    pseudo_label = np.zeros_like(
+        otsu_mask,
+        dtype=np.uint8
+    )
+
+    # Foreground
+    pseudo_label[otsu_mask > 0] = 1
+
+    # Boundary
+    pseudo_label[dilated_edges > 0] = 2
+
+    # Convert to pretraining intensity values
+    pretrain_image = np.zeros_like(
+        pseudo_label,
+        dtype=np.float32
+    )
+
+    pretrain_image[pseudo_label == 0] = 0.0
+    pretrain_image[pseudo_label == 1] = 127.0
+    pretrain_image[pseudo_label == 2] = 255.0
+
+    return pretrain_image[..., None]
 
 def create_otsu_target(input_img):
     """Create an Otsu binary target image."""
@@ -2944,11 +3061,152 @@ def create_otsu_target(input_img):
 
     thr = threshold_otsu(gray)
 
-    mask = (gray > thr).astype(np.float32)
+    mask = gray > thr
+
+    mask = remove_small_objects(mask, min_size=30)
+
+    before = mask.copy()
+
+    mask = binary_opening(mask, footprint=disk(2))
+
+    print(
+        "Opening changed pixels:",
+        int((before != mask).sum())
+    )
+
+    mask = binary_closing(mask, footprint=disk(2))
+
+    mask = mask.astype(np.float32)
 
     return mask[..., None]
 
 
+
+
+def create_bilateral_adaptive_target(input_img):
+    """Create Bilateral + Adaptive Threshold target."""
+
+    if input_img.ndim == 2:
+        gray = input_img
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 1:
+        gray = input_img[...,0]
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 3:
+        gray = rgb2gray(input_img)
+
+    else:
+        raise ValueError(f"Unsupported image shape: {input_img.shape}")
+
+    if gray.max() <= 1:
+        gray = (gray * 255).astype("uint8")
+    else:
+        gray = gray.astype("uint8")
+
+    gray = cv2.bilateralFilter(
+        gray,
+        d=9,
+        sigmaColor=75,
+        sigmaSpace=75,
+    )
+
+    mask = cv2.adaptiveThreshold(
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        35,
+        5,
+    )
+
+    mask = mask > 0
+
+    mask = remove_small_objects(mask, min_size=30)
+
+    mask = binary_opening(mask, footprint=disk(2))
+
+    mask = binary_closing(mask, footprint=disk(2))
+
+    return mask.astype(np.float32)[...,None]
+
+def create_canny_target(input_img):
+    """Create Gaussian + Otsu + Canny target."""
+
+    if input_img.ndim == 2:
+        gray = input_img
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 1:
+        gray = input_img[..., 0]
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 3:
+        gray = rgb2gray(input_img)
+
+    else:
+        raise ValueError(f"Unsupported image shape: {input_img.shape}")
+
+    if gray.max() <= 1:
+        gray = (gray * 255).astype("uint8")
+    else:
+        gray = gray.astype("uint8")
+
+    gray_blur = cv2.GaussianBlur(
+        gray,
+        (5, 5),
+        2,
+    )
+
+    _, foreground = cv2.threshold(
+        gray_blur,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+    )
+
+    edges = cv2.Canny(
+        gray_blur,
+        50,
+        150,
+    )
+
+    kernel = np.ones((3, 3), np.uint8)
+
+    edges = cv2.dilate(
+        edges,
+        kernel,
+        iterations=1,
+    )
+
+    mask = (edges > 0) & (foreground > 0)
+
+    return mask.astype(np.float32)[..., None]
+
+def create_edge_map_target(input_img):
+    """Create Bilateral + Canny edge map target (Dawoud et al.)."""
+
+    if input_img.ndim == 2:
+        gray = input_img
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 1:
+        gray = input_img[..., 0]
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 3:
+        gray = rgb2gray(input_img)
+
+    else:
+        raise ValueError(f"Unsupported image shape: {input_img.shape}")
+
+    if gray.max() <= 1:
+        gray = (gray * 255).astype("uint8")
+    else:
+        gray = gray.astype("uint8")
+
+    # Bilateral filter (same parameters as Dawoud et al.)
+    gray = cv2.bilateralFilter(gray, 7, 50, 50)
+
+    # Canny edge detector
+    edge = cv2.Canny(gray, 30, 100)
+
+    return (edge > 0).astype(np.float32)[..., None]
 
 def crappify(
     input_img: NDArray,
@@ -3612,3 +3870,146 @@ def preprocess_data(
         return y_data
     else:
         return x_data
+
+
+
+def create_nlm_v3_target(input_img):
+    """Median -> NLM -> Otsu target."""
+
+    if input_img.ndim == 2:
+        gray = input_img
+    elif input_img.ndim == 3 and input_img.shape[-1] == 1:
+        gray = input_img[..., 0]
+    elif input_img.ndim == 3 and input_img.shape[-1] == 3:
+        gray = rgb2gray(input_img)
+    else:
+        raise ValueError(f"Unsupported image shape: {input_img.shape}")
+
+    if gray.max() <= 1:
+        gray = (gray * 255).astype("uint8")
+    else:
+        gray = gray.astype("uint8")
+
+    gray = cv2.medianBlur(gray, 5)
+
+    gray = cv2.fastNlMeansDenoising(
+        gray,
+        None,
+        h=8,
+        templateWindowSize=7,
+        searchWindowSize=21,
+    )
+
+    _, mask = cv2.threshold(
+        gray,
+        0,
+        255,
+        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
+    )
+
+    mask = mask > 0
+
+    return mask.astype(np.float32)[..., None]
+
+
+def create_nlm_v4_target(input_img):
+    """Bilateral -> NLM -> Otsu target."""
+
+    if input_img.ndim == 2:
+        gray = input_img
+    elif input_img.ndim == 3 and input_img.shape[-1] == 1:
+        gray = input_img[..., 0]
+    elif input_img.ndim == 3 and input_img.shape[-1] == 3:
+        gray = rgb2gray(input_img)
+    else:
+        raise ValueError(f"Unsupported image shape: {input_img.shape}")
+
+    if gray.max() <= 1:
+        gray = (gray * 255).astype("uint8")
+    else:
+        gray = gray.astype("uint8")
+
+    gray = cv2.bilateralFilter(
+        gray,
+        9,
+        50,
+        50,
+    )
+
+    gray = cv2.fastNlMeansDenoising(
+        gray,
+        None,
+        h=8,
+        templateWindowSize=7,
+        searchWindowSize=21,
+    )
+
+    _, mask = cv2.threshold(
+        gray,
+        0,
+        255,
+        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
+    )
+
+    mask = mask > 0
+
+    return mask.astype(np.float32)[..., None]
+
+
+def create_nlm_target(input_img):
+    """Create NLM + Adaptive Threshold target."""
+
+    if input_img.ndim == 2:
+        gray = input_img
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 1:
+        gray = input_img[..., 0]
+
+    elif input_img.ndim == 3 and input_img.shape[-1] == 3:
+        gray = rgb2gray(input_img)
+
+    else:
+        raise ValueError(f"Unsupported image shape: {input_img.shape}")
+
+    if gray.max() <= 1:
+        gray = (gray * 255).astype("uint8")
+    else:
+        gray = gray.astype("uint8")
+
+    gray = cv2.medianBlur(gray, 3)
+
+    gray = cv2.fastNlMeansDenoising(
+        gray,
+        None,
+        h=10,
+        templateWindowSize=7,
+        searchWindowSize=21,
+    )
+
+    mask = cv2.adaptiveThreshold(
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        61,
+        8,
+    )
+
+    mask = mask < 128
+
+    mask = opening(mask, disk(1))
+
+    mask = remove_small_objects(
+        mask,
+        min_size=60,
+    )
+
+    mask = remove_small_holes(
+        mask,
+        area_threshold=60,
+    )
+
+    mask = closing(mask, disk(2))
+
+    return mask.astype(np.float32)[..., None]
+

@@ -310,6 +310,7 @@ class Base_Workflow(metaclass=ABCMeta):
                         self.cfg["MODEL"]["BMZ"] = tmp_BMZ_config["BMZ"]
                         self.cfg["MODEL"]["OUT_CHECKPOINT_FORMAT"] = tmp_BMZ_config["OUT_CHECKPOINT_FORMAT"]
                         self.cfg["MODEL"]["SKIP_UNMATCHED_LAYERS"] = tmp_BMZ_config["SKIP_UNMATCHED_LAYERS"]
+                        self.cfg["MODEL"]["ITEMS_TO_LOAD_FROM_CHECKPOINT"] = tmp_BMZ_config["ITEMS_TO_LOAD_FROM_CHECKPOINT"]
 
                         # Check if the merge is coherent
                         self.cfg["MODEL"]["LOAD_CHECKPOINT"] = True

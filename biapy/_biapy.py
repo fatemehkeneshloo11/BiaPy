@@ -1148,7 +1148,7 @@ class BiaPy:
             state_dict_sha256 = None
 
             # Isolate pytorch_state_dict from checkpoint
-            checkpoint = torch.load(state_dict_source, map_location="cpu", weights_only=True)
+            checkpoint = torch.load(state_dict_source, map_location="cpu", weights_only=False)
             if "model" in checkpoint:
                 state_dict_source = os.path.join(building_dir, "checkpoint.pth")
                 os.makedirs(building_dir, exist_ok=True)
