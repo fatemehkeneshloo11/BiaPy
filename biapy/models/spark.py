@@ -476,7 +476,7 @@ class SparK(nn.Module):
         feats.append(self.bottleneck(x))
         return feats
 
-    def forward(self, x: torch.Tensor, active_b1ff: Optional[torch.Tensor] = None) -> dict:
+    def forward(self, x: torch.Tensor, active_b1ff: Optional[torch.Tensor] = None, return_just_preds: bool = False):
         """
         Returns
         -------
@@ -486,7 +486,12 @@ class SparK(nn.Module):
               it is de-normalized with the mean and std of each input patch (for visualization
               and metrics only, it carries no gradient).
             - ``"mask"``: shape (B, L), 1 = masked, 0 = visible (same convention as BiaPy's MAE).
+
+            If ``return_just_preds`` is True, only the reconstructed image (B, C, H, W) is returned
+            and the mask is fixed (seed 0), as in BiaPy's MAE (used for the BioImage Model Zoo sample).
         """
+        if return_just_preds:
+            torch.manual_seed(0)  # deterministic mask, as in BiaPy's MAE
         if active_b1ff is None:
             active_b1ff = self.generate_mask(x.shape[0], x.device)
 
@@ -515,6 +520,8 @@ class SparK(nn.Module):
         loss = (l2 * mask).sum() / (mask.sum() + 1e-8)
 
         pred = (rec * std + mean).detach()
+        if return_just_preds:
+            return self.unpatchify(pred)
         return {"loss": loss, "pred": pred, "mask": mask}
 
     # ---------------------------------------------------------------------------------------
