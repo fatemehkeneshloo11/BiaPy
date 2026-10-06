@@ -335,7 +335,9 @@ class SparK(nn.Module):
     decoder_width : int
         Channels of the decoder at its deepest scale; halved at every upsampling.
     densify_norm : str
-        Normalization applied to the sparse features before filling them: ``"ln"``, ``"bn"`` or ``"none"``.
+        Normalization applied to the sparse features before filling them: ``"ln"``, ``"bn"``, ``"in"`` or
+        ``"none"``. ``"in"`` is OrgMIM's densify norm: per-channel statistics over the visible positions
+        of the whole batch, without running statistics (batch statistics also in eval mode).
     norm_pix_loss : bool
         Normalize each target patch with its own mean and std before the L2 loss.
     """
@@ -436,10 +438,12 @@ class SparK(nn.Module):
                 norm = SparseBatchNorm2d(e_width)
             elif self.densify_norm_str == "ln":
                 norm = SparseConvNeXtLayerNorm(e_width, data_format="channels_first", sparse=True)
+            elif self.densify_norm_str == "in":
+                norm = SparseBatchNorm2d(e_width, eps=1e-6, track_running_stats=False)
             elif self.densify_norm_str == "none":
                 norm = nn.Identity()
             else:
-                raise ValueError("SparK: densify_norm must be 'ln', 'bn' or 'none'")
+                raise ValueError("SparK: densify_norm must be 'ln', 'bn', 'in' or 'none'")
             self.densify_norms.append(norm)
 
             if i == 0 and e_width == d_width:

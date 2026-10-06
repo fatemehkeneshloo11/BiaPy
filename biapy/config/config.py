@@ -1368,7 +1368,7 @@ class Config:
         _C.MODEL.SPARK.MASK_RATIO = 0.6
         # Channels of the SparK light decoder at its deepest scale (halved at every upsampling)
         _C.MODEL.SPARK.DECODER_WIDTH = 256
-        # Normalization of the sparse features before densifying. Options: ['ln', 'bn', 'none']
+        # Normalization of the sparse features before densifying. Options: ['ln', 'bn', 'in', 'none']
         _C.MODEL.SPARK.DENSIFY_NORM = "ln"
         # Normalize each target patch by its own mean and std before the L2 loss (as in SparK and MAE)
         _C.MODEL.SPARK.NORM_PIX_LOSS = True
