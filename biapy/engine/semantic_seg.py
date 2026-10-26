@@ -371,29 +371,6 @@ class Semantic_Segmentation_Workflow(Base_Workflow):
             else:
                 _targets = targets
 
-
-        # ---------------------------------------------------------
-        # During TEST convert 3-class prediction to binary:
-        # background = 0
-        # foreground + edge = 1
-        # ---------------------------------------------------------
-        if (
-            not train
-            and self.cfg.DATA.N_CLASSES == 3
-            and _output.ndim == 4
-            and _output.shape[1] == 3
-        ):
-            # logits -> class labels
-            _output = torch.argmax(_output, dim=1, keepdim=True)
-
-            # merge class 1 and class 2
-            _output = (_output > 0).long()
-
-            # convert GT {0,255} -> {0,1}
-            if _targets.ndim == 4 and _targets.shape[1] == 3:
-                _targets = torch.argmax(_targets, dim=1, keepdim=True)
-
-            _targets = (_targets > 0).long()
         out_metrics = {}
         list_to_use = self.train_metrics if train else self.test_metrics
         list_names_to_use = self.train_metric_names if train else self.test_metric_names

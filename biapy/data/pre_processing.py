@@ -3061,7 +3061,7 @@ def create_otsu_target(input_img):
 
     thr = threshold_otsu(gray)
 
-    mask = gray > thr
+    mask = gray < thr
 
     mask = remove_small_objects(mask, min_size=30)
 
